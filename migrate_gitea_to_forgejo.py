@@ -2,7 +2,10 @@
 import requests
 import json
 import sys
-from urllib.parse import urljoin
+
+
+def urljoin(part1, part2):
+    return f'{part1}{part2}'
 
 
 def get_current_user(target_url, target_token):
