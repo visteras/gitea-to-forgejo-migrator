@@ -177,13 +177,25 @@ def get_all_orgs(source_url, source_token):
     session = requests.Session()
     session.headers.update({'Authorization': f'token {source_token}'})
 
-    orgs_url = urljoin(source_url, '/api/v1/orgs')
-    response = session.get(orgs_url)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        print(f"Error fetching organizations list: {response.text}")
-        return []
+    orgs = []
+    page = 1
+    
+    while True:
+        orgs_url = urljoin(source_url, f'/api/v1/orgs?page={page}&limit=50')
+        response = session.get(orgs_url)
+        
+        if response.status_code != 200:
+            print(f"Error fetching organizations list: {response.text}")
+            break
+            
+        page_data = response.json()
+        if not page_data:
+            break
+            
+        orgs.extend(page_data)
+        page += 1
+        
+    return orgs
 
 
 def migrate_owner_repos(source_url, source_token, target_url, target_token, source_owner, target_uid, target_owner_name,
@@ -211,17 +223,28 @@ def migrate_owner_repos(source_url, source_token, target_url, target_token, sour
     session_target.headers.update({'Authorization': f'token {target_token}', 'Content-Type': 'application/json'})
 
     # Get the list of source repositories
-    if is_org:
-        repos_url = urljoin(source_url, f'/api/v1/orgs/{source_owner}/repos')
-    else:
-        repos_url = urljoin(source_url, f'/api/v1/users/{source_owner}/repos')
+# Get the list of source repositories (with pagination)
+    repos = []
+    page = 1
+    
+    while True:
+        if is_org:
+            repos_url = urljoin(source_url, f'/api/v1/orgs/{source_owner}/repos?page={page}&limit=50')
+        else:
+            repos_url = urljoin(source_url, f'/api/v1/users/{source_owner}/repos?page={page}&limit=50')
 
-    response = session_source.get(repos_url)
-    if response.status_code != 200:
-        print(f"Error fetching repositories list for {source_owner}: {response.text}")
-        return
-
-    repos = response.json()
+        response = session_source.get(repos_url)
+        
+        if response.status_code != 200:
+            print(f"Error fetching repositories list for {source_owner}: {response.text}")
+            break
+            
+        page_data = response.json()
+        if not page_data:
+            break
+            
+        repos.extend(page_data)
+        page += 1
     print(f"Found {len(repos)} repositories for {source_owner}.")
 
     migrated_count = 0
