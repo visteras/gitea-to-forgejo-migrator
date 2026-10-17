@@ -1,7 +1,8 @@
 # Gitea to Forgejo Migrator
 
-This repository contains two migration scripts:
+This repository contains three migration scripts:
 
+- convert_gitea_dump_to_forgejo.py — best-effort partial migration of a Gitea SQLite dump into a Forgejo 17.0 database schema.
 - migrate_gitea_to_forgejo.py — migrate users/organizations and repositories from a Gitea instance to a Forgejo instance via REST API.
 - migrate_docker_skopeo.py — migrate container images between registries (e.g., Gitea/Forgejo registries) using skopeo and the OCI API.
 
@@ -31,6 +32,16 @@ Attribution: These scripts and this documentation were generated with the assist
     - Windows (Chocolatey): choco install skopeo
 - Ensure skopeo and curl are available in PATH (e.g., skopeo --version, curl --version).
 
+
+## convert_gitea_dump_to_forgejo.py
+
+Create a **partial** Forgejo 17.0 dump from a Gitea SQLite dump and a Forgejo 17.0 dump used only as the target schema template:
+
+    python convert_gitea_dump_to_forgejo.py gitea-dump.zip forgejo-17-template.zip forgejo-partial.zip
+
+The output archive and its `.report.json` sidecar must not already exist. The template database is cleared and used for its schema and Forgejo migration metadata; source files and `app.ini` are retained except for Gitea's `data/indexers/issues.bleve` cache, which may use an incompatible analyzer mapping. The script copies common columns, imports completed Actions run/job/task/step history, flattens the supplied single-attempt-per-run model, and sets imported workflows to `.gitea/workflows`. It rewrites verifiable Gitea Actions commit-status URLs from run/job IDs to Forgejo's per-repository run indexes and zero-based job positions; links whose source run or job is missing are preserved and counted in the report. It rejects multi-attempt, unfinished, or unsupported Gitea-only Actions features rather than guessing. Pull-mirror rows are copied with `encrypted_remote_address` left empty for Forgejo's built-in recovery from the archived Git `origin`; it encrypts the configured URL and sanitizes Git config on first mirror access/sync. Until then, credentials remain in the preserved Git config files. One repository is marked as a mirror without a mirror row; that source inconsistency is retained and reported. Empty incompatible artifact/output tables are skipped. After restoring and starting Forgejo, rebuild the issue indexer from Admin → Monitor → Cron; see the [backup/restore guidance](https://forgejo.org/docs/v17.0/admin/setup/backup/#restoring-forgejo). It checks SQLite integrity and foreign keys, but does not verify the database by starting Forgejo. Review the report and [DB_MIGRATION_GAPS.md](DB_MIGRATION_GAPS.md) for every unmapped table/field.
+
+This is a best-effort conversion, not an upstream-supported direct migration. Forgejo 17's documented transparent path is Gitea up to 1.22 via Forgejo 10.0, then upgrade Forgejo. For newer Gitea versions, Forgejo describes manual database/data changes as best effort. See the [Forgejo upgrade guide](https://forgejo.org/docs/v17.0/admin/upgrade/) and [compatibility note](https://forgejo.org/2024-12-gitea-compatibility/). Keep the source `[security].SECRET_KEY` when restoring encrypted data, retain the original dump, and test restoration on an isolated instance first.
 
 ## 1) migrate_gitea_to_forgejo.py
 
@@ -123,4 +134,4 @@ The script will:
 
 ## Development notes
 - All console output and comments are in English per project requirement.
-- Minimal changes were made to existing logic; only messages and comments were translated, and README.md was added.
+- The dump converter uses only Python's standard library. Tests run with `python -m unittest discover -s tests`.
