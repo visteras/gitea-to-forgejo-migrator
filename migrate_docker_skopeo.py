@@ -71,6 +71,7 @@ def copy_image_skopeo(src_url, src_user, src_token, dst_url, dst_user, dst_token
     dst_ref = f'docker://{norm_dst}/{repo}:{tag}'
     cmd = [
         'skopeo', 'copy',
+        '--all',
         '--src-tls-verify=false',  # If self-signed; remove for production
         '--dest-tls-verify=false',
         f'--src-creds={src_user}:{src_token}',
